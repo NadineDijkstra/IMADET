@@ -1,6 +1,6 @@
 # IMADET - The influence of mental imagery on perceptual detection
 
-This repository contains data, analysis code and experimental code supporting 
+This repository contains data, analysis code and experimental code supporting: 
 
 Dijkstra, Mazor, Kok & Fleming (2021) "Mistaking imagination for reality: congruent mental imagery leads to more liberal perceptual detection"
 
