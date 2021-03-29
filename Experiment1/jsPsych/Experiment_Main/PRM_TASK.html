@@ -1,0 +1,748 @@
+<!doctype html>
+<html>
+  <head>
+    <title>My experiment</title>
+    <script src="jspsych-6.1.0/jspsych.js"></script>
+    <script src="jspsych-6.1.0/plugins/jspsych-html-keyboard-response.js"></script>
+    <script src="jspsych-6.1.0/plugins/jspsych-image-keyboard-response.js"></script>
+    <script src="jspsych-6.1.0/plugins/jspsych-call-function.js"></script>
+    <script src="jspsych-6.1.0/plugins/jspsych-survey-likert.js"></script>
+    <script src="jspsych-6.1.0/plugins/jspsych-survey-text.js"></script>
+    <script src="jspsych-6.1.0/plugins/jspsych-animation.js"></script>
+    <script src="jspsych-6.1.0/plugins/jspsych-external-html.js"></script>
+    <script src="jatos.js"></script>
+
+    <link href="jspsych-6.1.0/css/jspsych.css" rel="stylesheet" type="text/css"></link>
+    <link href="style.css" rel="stylesheet" type="text/css" />
+  </head>
+  <body></body>
+  <script>
+
+    /* INITIALIZE SOME VARIABLES */
+    const num_steps = 20;
+    const stim_dur  = 2000; /* milliseconds */
+    const fix_dur = 200;
+
+    const practice_reps = 2; /* x 3 trials - loop this until at least 75% correct  */
+
+    const num_ima_trials = 10; /*10 */
+    const num_ima_reps = 1; /* how often to repeat the 2 orientations */
+
+    const threshold_level = 70; /* the value to staircase to */
+    const lower_bound = 65; /* lower than this - increase isibility */
+    const upper_bound = 75; /* higher than this - decrease visibility */
+    const num_trials_stair_block = 10; /* 12 evaluate acc after this many trials */
+    const num_stair_reps = 12; /* 12 number of staircase reps - two blocks - one per tilt */
+
+    const num_trials_main  = 24; /* 24 per block - needs to be dividible by 2*/
+    const num_blocks = 3; /* 3 per conditon 0(no-ima_left), 1(no-ima_right),2(ima_left),3(ima_right)*/
+
+    /* RESPONDE MAPPING */
+    r_idx = jsPsych.randomization.sampleWithReplacement([0,1],1);
+    if (r_idx == 0){
+      responses = ['F','J']; /* yes - no*/
+      response_prompt = 'Yes [' + responses[0] + '] or no [' + responses[1] + ']';
+    } else if (r_idx == 1){
+      responses = ['J','F'];
+      response_prompt = 'No [' + responses[1] + '] or yes [' + responses[0] + ']';
+    };
+
+
+    /* GLOBAL VARIABLES */
+    window.start_vis_level = 46;
+    window.vis_level = window.start_vis_level;
+    window.trl_num = 0;
+    window.stair_num = 0;
+    window.block_num = 0;
+
+    /* IMAGE SEQUENCE FUNCTIONS */
+    function makeStimSequence(startValue, stopValue,cardinality,stim) {
+      var arr = [];
+      if (stim > 0 ){
+        var step = (stopValue - startValue) / (cardinality - 1);
+        for (var i = 0; i < cardinality; i++) {
+          var vis = Math.round(startValue + (step * i));
+          arr.push("img/stim_" + stim.toString() + "_vis_" + vis.toString() + ".png");
+        }
+      } else if (stim == 0){
+        ranNoiseOrder = jsPsych.randomization.repeat([1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20],1);
+        for (var i = 0; i < cardinality; i++) {
+          var random_number = ranNoiseOrder[i];
+        arr.push("img/noise_" + random_number.toString() + ".png");
+        }
+      }
+      return arr;
+    };
+
+    /* SOME ESSENTIAL VARS*/
+    /* fixation */
+    var fixation = {
+      type: 'html-keyboard-response',
+      stimulus: '<div style="font-size:60px;">+</div>',
+      choices: jsPsych.NO_KEYS,
+      trial_duration: fix_dur,
+      data: {test_part: 'fixation'}
+    };
+
+    /* update trial number */
+    var update_trial_number = {
+      type: "call-function",
+      func: function() {
+        window.trl_num++;
+      }
+    };
+
+    /* CREATE TIMELINE */
+    var timeline = [];
+
+    /* INFORMATION SHEET */
+    var information_sheet = {
+      type: "external-html",
+      url: "InformationSheet_Web_1260_003_Nov2018.html",
+      cont_btn: "Continue"
+    };
+    timeline.push(information_sheet);
+
+    /* CONSENT FORM */
+    var information_sheet = {
+      type: "external-html",
+      url: "ConsentForm_Web_1260_003_May2018.html",
+      cont_btn: "Start",
+      check_fn: function(elem){
+        if (document.getElementById('consent_checkbox').checked) {
+          return true;
+        }
+        else {
+          alert("If you wish to participate, you must check the box next to the statement 'I understand all the above and confirm that I wish to continue.'");
+          return false;
+        }
+        return false;
+      }
+    };
+    timeline.push(information_sheet);
+
+    /* WELCOME MESSAGE */
+    var welcome = {
+      type: "html-keyboard-response",
+      stimulus: "Welcome to the experiment. Press any key to begin."
+    };
+    timeline.push(welcome);
+
+    /* QUESTIONNAIRES*/
+    var questionnaire_instr = {
+      type: "html-keyboard-response",
+      stimulus: "Before we begin with the main task, <br> we'd like to ask you to fill out two questionnaires <br>" +
+      "Please take your time to answers the questions truthfully <br> " +
+      "Press [space] to continue ",
+      choices: ['space']
+    };
+
+    var VVIQ_instr = {
+      type: "html-keyboard-response",
+      stimulus: "For each item on this questionnaire, try to form a visual image, " +
+      "and consider your experience carefully. <br> For any image that you do experience, " +
+      "rate how vivid it is using the five-point scale described next. <br>" +
+      "If you do not have a visual image, rate vividness as ‘1’.  <br>" +
+      "Only use ‘5’ for images that are truly as lively and vivid as real seeing. <br>" +
+      "Please note that there are no right or wrong answers to the questions, <br>" +
+      "and that it is not necessarily desirable to experience imagery or,  <br> " +
+      "if you do, to have more vivid imagery. <br>" +
+      "Press [space] to start the first questionnaire ",
+      choices: ['space']
+    };
+
+    var scale_VVIQ = [
+      "No image at all, you only “know” that you are thinking of the object",
+      "Vague and dim",
+      "Moderately clear and lively",
+      "Clear and reasonably vivid",
+      "Perfectly clear and as vivid as real seeing"
+    ];
+
+    var vviq_1 = {
+      type: "survey-likert",
+      preamble: "Part 1/4: Think of some relative or friend whom you frequently see " +
+      "(but who is not with you at present) <br> and consider carefully the picture " +
+      "that comes before your mind’s eye.",
+      questions: [
+        {prompt: "The exact contour of face, head, shoulders and body", labels: scale_VVIQ, required: true},
+        {prompt: "Characteristic poses of head, attitudes of body etc.", labels: scale_VVIQ, required: true},
+        {prompt: "The precise carriage, length of step etc., in walking", labels: scale_VVIQ, required: true},
+        {prompt: "The different colours worn in some familiar clothes", labels: scale_VVIQ, required: true},
+      ]
+    };
+
+    var vviq_2 = {
+      type: "survey-likert",
+      preamble: "Part 2/4:  Visualise a rising sun. Consider carefully the picture that comes before your mind’s eye.",
+      questions: [
+        {prompt: "The sun rising above the horizon into a hazy sky", labels: scale_VVIQ, required: true},
+        {prompt: "The sky clears and surrounds the sun with blueness", labels: scale_VVIQ, required: true},
+        {prompt: "Clouds.  A storm blows up with flashes of lightning", labels: scale_VVIQ, required: true},
+        {prompt: "A rainbow appears", labels: scale_VVIQ, required: true},
+      ]
+    };
+
+    var vviq_3 = {
+      type: "survey-likert",
+      preamble: "Part 3/4: Think of the front of a shop which you often go to.  Consider the picture that comes before your mind’s eye.",
+      questions: [
+        {prompt: "The overall appearance of the shop from the opposite side of the road", labels: scale_VVIQ, required: true},
+        {prompt: "A window display including colours, shapes and details of individual items for sale", labels: scale_VVIQ, required: true},
+        {prompt: "You are near the entrance. The colour, shape and details of the door", labels: scale_VVIQ, required: true},
+        {prompt: "You enter the shop and go to the counter. The counter assistant serves you. Money changes hands", labels: scale_VVIQ, required: true},
+      ]
+    };
+
+    var vviq_4 = {
+      type: "survey-likert",
+      preamble: "Part 4/4: Finally, think of a country scene which involves trees, mountains and a lake. " +
+      "Consider the picture that comes before your mind’s eye.",
+      questions: [
+        {prompt: "The contours of the landscape", labels: scale_VVIQ, required: true},
+        {prompt: "The colour and shape of the trees", labels: scale_VVIQ, required: true},
+        {prompt: "The colour and shape of the lake", labels: scale_VVIQ, required: true},
+        {prompt: "A strong wind blows on the trees and on the lake causing waves in the water", labels: scale_VVIQ, required: true},
+      ]
+    };
+
+    var LHSL_instr = {
+      type: "html-keyboard-response",
+      choices: ['space'],
+      stimulus: "The next questionnaire asks about your perceptual experiences <br> " +
+      "It is a lot shorter than the one you just did <br>" +
+      "Press [space] to start the second and last questionnaire ",
+    };
+
+    var scale_LHSL = [
+      "Never",
+      "Rarely",
+      "Sometimes",
+      "Often",
+      "Always"
+    ];
+
+    var lhsl1 = {
+      type: "survey-likert",
+      preamble: "Part 1/2",
+      questions: [
+        {prompt: "I hear a voice speaking my thoughts aloud", labels: scale_LHSL, required: true},
+        {prompt: "I hear the telephone ring and find that I am mistaken", labels: scale_LHSL, required: true},
+        {prompt: "I hear people call my name and find that nobody has done so ", labels: scale_LHSL, required: true},
+        {prompt: "I can hear music when it is not being played", labels: scale_LHSL, required: true},
+        {prompt: "I have had the experience of hearing a person’s voice and then found that there was no one there", labels: scale_LHSL, required: true}
+      ]
+    };
+
+    var lhsl2 = {
+      type: "survey-likert",
+      preamble: "Part 2/2",
+      questions: [
+        {prompt: "When I look at things they look unreal to me", labels: scale_LHSL, required: true},
+        {prompt: "I see shadows and shapes when there is nothing there", labels: scale_LHSL, required: true},
+        {prompt: "When I look at myself in the mirror, I look different", labels: scale_LHSL, required: true},
+        {prompt: "When I look at things, they appear strange to me", labels: scale_LHSL, required: true}
+      ]
+    };
+
+    timeline.push(questionnaire_instr,VVIQ_instr,vviq_1,vviq_2,vviq_3,vviq_4,LHSL_instr,lhsl1,lhsl2);
+
+    /* TASK EXPLANATION */
+    var explain_task = {
+      type: "html-keyboard-response",
+      on_start:  function(){
+        jsPsych.pluginAPI.preloadImages(["img/example_stim-01.png"])
+      },
+      stimulus: "Thank you! <br>"+
+      "During the rest of this experiment you will be looking for <strong> gratings </strong> in <strong>noise</strong> (see below) <br>" +
+      "<strong>Gratings</strong> are images of alternating black and white lines (left) <br> " +
+      "<strong>Noise</strong> is a collection of random black and white pixels (middle) <br>" +
+      "On every trial, your task it to decide whether a grating was present in the noise or not (right)<br><br>" +
+      "<img src='img/example_stim-01.png' width=600 ></img>" +
+      "<br><br> Press [space] to continue " ,
+      choices: ['space']
+    };
+    timeline.push(explain_task);
+
+    /* PRACTICE TRIALS */
+    var practice_instruction = {
+      type: "html-keyboard-response",
+      stimulus: "We will first start with a few practice trials <br>" +
+      "Left and right tilted gratings will gradually appear in the noise <br>" +
+      "Afterwards, if you saw a grating press [" + responses[0] + "] <br> " +
+      "If you did not see a grating press [" + responses[1] + "] <br>" +
+      "<br> Press [space] to start the practice trials",
+      choices: ['space']
+    };
+    timeline.push(practice_instruction);
+
+    var show_dynamic_stimulus = {
+      type: 'animation',
+      stimuli: jsPsych.timelineVariable('stimulus'),
+      choices: jsPsych.NO_KEYS,
+      on_start: function(){
+        jsPsych.pluginAPI.preloadImages(jsPsych.timelineVariable('stimulus',true))
+      },
+      frame_isi: 0,
+      frame_time: Math.round(stim_dur/num_steps)
+    };
+
+    var response_screen = {
+      type: 'html-keyboard-response',
+      stimulus: 'Was there a grating on the screen?',
+      choices: responses,
+      prompt: response_prompt,
+      data: jsPsych.timelineVariable('data'),
+      on_finish: function(data){
+        data.correct = data.key_press == jsPsych.pluginAPI.convertKeyCharacterToKeyCode(data.correct_response);
+      },
+    };
+
+    /* combine into trial procedure */
+    var detection_practice_procedure = {
+      timeline: [fixation,show_dynamic_stimulus,response_screen],
+      timeline_variables: [
+        {
+          stimulus: makeStimSequence(1,window.vis_level,num_steps,1),
+          data: { test_part: 'det_practice', correct_response: responses[0] }
+        },
+        {
+          stimulus: makeStimSequence(1,window.vis_level,num_steps,2),
+          data: { test_part: 'det_practice', correct_response: responses[0] }
+        },
+        {
+          stimulus: makeStimSequence(1,window.vis_level,num_steps,0),
+          data: { test_part: 'det_practice', correct_response: responses[1] }
+        }
+      ],
+      sample: {
+        type: 'fixed-repetitions',
+        size: practice_reps,
+      }
+    };
+
+    var detection_feedback = {
+      type: 'html-keyboard-response',
+      choices: ['space'],
+      stimulus: function() {
+        var trials = jsPsych.data.get().last(practice_reps*3*3).filter({test_part: 'det_practice'});
+        var num_correct = trials.filter({correct: true}).count();
+        var accuracy = Math.round(num_correct / trials.count() * 100);
+
+        if (accuracy > 74){
+          return "Excellent, you responded correctly on " + num_correct +
+          " out of " + trials.count() + " trials. <br>" +
+          "<br> Press [space] to continue "
+        } else {
+          return "This time, you responded correctly on " + num_correct +
+          " out of " + trials.count() + " trials. <br>" +
+          "Let's do a few more practice trials <br> " +
+          "<br> Press [space] to continue "
+        }
+      }
+    };
+
+    var detection_practice_loop_node = {
+      timeline: [detection_practice_procedure,detection_feedback],
+      loop_function: function(data) {
+        var trials = jsPsych.data.get().last(practice_reps*3*3).filter({test_part: 'det_practice'});
+        var num_correct = trials.filter({correct: true}).count();
+        var accuracy = Math.round(num_correct / trials.count() * 100);
+
+        if (accuracy > 74){
+          return false;
+        } else {
+          window.vis_level++; /* make it a bit easier then */
+          return true;
+        }
+      }
+    };
+    timeline.push(detection_practice_loop_node);
+
+
+    /* STAIRCASE DETECTION */
+    var stair_instruction = {
+      type: "html-keyboard-response",
+      stimulus: "We will now do two calibration blocks. <br>" +
+      "On 75% of the trials, a grating will appear in the noise. <br>" +
+      "Over time, it will become harder and harder to see the grating. <br>" +
+      "Do not worry if you become unsure about whether you saw something or not, that is supposed to happen. <br> " +
+      "Just give your best guess on each trial. <br>" +
+      "Each calibration block will take about 5 minutes <br>" +
+      "<br> Press [space] to continue ",
+      choices: ['space']
+    };
+    timeline.push(stair_instruction);
+
+    var response = [responses[1],responses[0],responses[0]];
+    window.stairblock_order = jsPsych.randomization.repeat([0,1],1);
+    window.stair_block = 0;
+
+    for (var stairblock = 0; stairblock < 2; stairblock++){
+        var stairblock_instruction = {
+          type: "html-keyboard-response",
+          stimulus: function(){
+            if (window.stairblock_order[window.stair_block]==0){ /* Left tilt */
+              window.trial_order = jsPsych.randomization.repeat([0,1],num_trials_stair_block/2);
+              return "During this block you will see left tilted gratings. <br>" +
+              "<br> Press [space] to start "}
+            else if (window.stairblock_order[window.stair_block]==1){ /* Right tilt */
+              window.trial_order = jsPsych.randomization.repeat([0,2],num_trials_stair_block/2);
+              return "During this block you will see right tilted gratings. <br>" +
+              "<br> Press [space] to start "}
+          },
+          choices: ['space'],
+          on_finish: function(){
+            window.vis_level = window.start_vis_level;
+            console.log(window.trial_order)
+          }
+        };
+        timeline.push(stairblock_instruction)
+
+    for (var stair = 0; stair < num_stair_reps; stair++){
+      for (var trl = 0; trl < num_trials_stair_block; trl++){
+
+        var show_dynamic_stimulus = {
+          type: 'animation',
+          stimuli: function() {
+            window.stim_id = window.trial_order[window.trl_num];
+            arr = makeStimSequence(1,window.vis_level,num_steps,window.stim_id);
+            jsPsych.pluginAPI.preloadImages(arr)
+            return arr
+          },
+          choices: jsPsych.NO_KEYS,
+          frame_isi: 0,
+          frame_time: Math.round(stim_dur/num_steps),
+          on_finish: function(){
+            console.log(window.trl_num)
+          }
+        };
+
+        var response_screen = {
+          type: "html-keyboard-response",
+          choices: responses,
+          stimulus: 'Was there a grating on the screen?',
+          prompt: response_prompt,
+          data: function() {
+            window.stim_id = window.trial_order[window.trl_num];
+            return {test_part: 'stair_test', correct_response: response[window.stim_id]}
+          },
+          on_finish: function(data){
+            data.correct = data.key_press == jsPsych.pluginAPI.convertKeyCharacterToKeyCode(data.correct_response);
+          }
+        };
+
+        timeline.push(fixation,show_dynamic_stimulus,response_screen,update_trial_number);
+      }
+
+      var stair_update = {
+        type: "call-function",
+        func: function(){
+          var trials = jsPsych.data.get().last(num_trials_stair_block*4).filter({test_part: 'stair_test'});/* count timeline events */
+          var num_correct = trials.filter({correct: true}).count();
+          var accuracy = Math.round(num_correct / trials.count() * 100);
+          var prev_vis_level = window.vis_level;
+
+          if (accuracy > upper_bound){
+            window.vis_level = prev_vis_level - Math.round((accuracy-threshold_level)/10);
+          }
+          else if (accuracy < lower_bound){
+            window.vis_level = prev_vis_level + Math.round((threshold_level-accuracy)/10);
+          }
+
+          if (window.vis_level > 50){window.vis_level = 50}
+
+          return window.vis_level
+        },
+        data: function() {
+          var trials = jsPsych.data.get().last(num_trials_stair_block*4).filter({test_part: 'stair_test'});/* count timeline events */
+          var num_correct = trials.filter({correct: true}).count();
+          var accuracy = Math.round(num_correct / trials.count() * 100);
+
+          return {test_part: 'stair_update', acc: accuracy, new_vis_level: window.vis_level}
+        },
+        on_finish: function(){
+          console.log(window.vis_level)
+        }
+      };
+
+      /* update stair number */
+      var update_stair_number = {
+        type: "call-function",
+        func: function() {
+          window.stair_num++;
+          window.trl_num = 0;
+          if (window.stairblock_order[window.stair_block]==0){ /* Left tilt */
+            window.trial_order = jsPsych.randomization.repeat([0,1],num_trials_stair_block/2);
+          }
+          else if (window.stairblock_order[window.stair_block]==1){ /* Right tilt */
+            window.trial_order = jsPsych.randomization.repeat([0,2],num_trials_stair_block/2);
+          }
+        }
+      };
+      timeline.push(stair_update,update_stair_number);
+    };
+
+    var update_stairblock = {
+      type: "call-function",
+      func: function(){
+        if (window.stairblock_order[window.stair_block]==0){ /* Left tilt */
+          window.left_vis_level = window.vis_level; /* Save staircased vis level */
+        }
+        else if (window.stairblock_order[window.stair_block]==1){ /* Right tilt */
+          window.right_vis_level = window.vis_level;
+        }
+        window.stair_block++;
+      }
+    };
+    timeline.push(update_stairblock);
+    }; /* End staircase two blocks */
+
+    /* PRACTICE IMAGERY */
+    var instr_imagery = {
+      type: "html-keyboard-response",
+      stimulus: "Another part of the experiment is that we will sometimes ask you <br> " +
+      "to imagine a grating while you are looking at the noise patterns. <br> " +
+      "You will always be asked to imagine the same grating for a few trials in a row. <br>" +
+      "We will now practice this. <br>" +
+      "<br> Press [space] to continue",
+      choices: ['space']
+    }
+    timeline.push(instr_imagery);
+
+    window.order_ima = jsPsych.randomization.repeat([0,1],num_ima_reps);
+    window.ima_block = 0;
+
+    for (var block = 0; block < (num_ima_reps*2); block++){
+
+      var start_ima_block = {
+        type: "html-keyboard-response",
+        stimulus: function() {
+
+          if (window.order_ima[window.ima_block] == 0){
+            var stim_instr = " a left tilted grating ";
+            var stim_pic   = "img/stim_1_vis_50.png";
+          } else if (window.order_ima[window.ima_block] == 1) {
+            var stim_instr = " a right tilted grating ";
+            var stim_pic   = "img/stim_2_vis_50.png";
+          };
+
+          jsPsych.pluginAPI.preloadImages([stim_pic])
+
+          window.ima_block++
+
+        return "For the next few trials, please imagine " + stim_instr + " (see below). <br> " +
+        "Imagine the grating as vividly as possible, as if it was actually presented on the screen. <br> " +
+        "Please keep your eyes open and look at the noise while imagining. <br>" +
+        "After each trial, you will be asked to rate the vividness of your imagery <br> " +
+        "on a scale from 1 (not vivid at all) to 5 (perfectly clear and as vivid as real seeing). <br><br>" +
+        "<img src=" + stim_pic + " width=200 ></img>" +
+        "<br> <br> Press [space] to continue "
+        },
+      choices: ['space']
+      };
+
+      var show_dynamic_noise = {
+        type: 'animation',
+        stimuli: function() {
+          arr = makeStimSequence(1,window.vis_level,num_steps,0);
+          jsPsych.pluginAPI.preloadImages(arr)
+          return arr
+        },
+        choices: jsPsych.NO_KEYS,
+        frame_isi: 0,
+        frame_time: Math.round(stim_dur/num_steps)
+      };
+
+      var ima_response = {
+        type: "html-keyboard-response",
+        choices: ['0', '1','2','3','4','5'],
+        stimulus: 'How vivid was your mental image?',
+        prompt: 'Not vivid at all [1] - As vivid as real seeing [5]',
+        data: {test_part: 'ima_practice'}
+      };
+
+      var ima_procedure = {
+        timeline: [fixation, show_dynamic_noise,ima_response],
+        repetitions: num_ima_trials
+      };
+
+      timeline.push(start_ima_block,ima_procedure);
+    };
+
+
+    /* MAIN EXPERIMENT */
+    var main_start = {
+      type: "html-keyboard-response",
+      stimulus: "We will now continue to the main part of the experiment. <br>" +
+      "There will be " + (num_blocks*4) + " short blocks in total. <br> " +
+      "During each block a grating of one orientation will be present on 75% of the trials. <br> " +
+      "During half of the blocks you will be asked to also imagine the grating while looking at the noise. <br>" +
+      "Please imagine the grating as vividly as possible, as if it was actually presented on the screen. <br>" +
+      "Your task is again to indicate whether a grating was present or not. <br>" +
+      "Feel free to take a short break at the start of a new block whenever you want to. <br> " +
+      "<br> Press [space] to continue ",
+      choices: ['space']
+    };
+    timeline.push(main_start);
+
+    /* create randomization */
+    condition_order = jsPsych.randomization.repeat([0,1,2,3],num_blocks);
+
+    /* run over blocks */
+    for (var block = 0; block < (num_blocks*4); block++){
+
+      var block_start = {
+        type: "html-keyboard-response",
+        stimulus: function() {
+
+          window.trl_num = 0;
+
+          if (condition_order[window.block_num] == 0){
+            window.trial_order = jsPsych.randomization.repeat([0,1],num_trials_main/2);
+            var stim_instr = " left tilted gratings. ";
+            var stim_pic   = "img/stim_1_vis_50.png";
+            var ima_instr  = " do <strong>not</strong> ";
+            window.vis_level = window.left_vis_level;
+          } else if (condition_order[window.block_num] == 1) {
+            window.trial_order = jsPsych.randomization.repeat([0,2],num_trials_main/2);
+            var stim_instr = " right tilted gratings. ";
+            var stim_pic   = "img/stim_2_vis_50.png";
+            var ima_instr = " do <strong>not</strong> ";
+            window.vis_level = window.right_vis_level;
+          } else if (condition_order[window.block_num] == 2) {
+            window.trial_order = jsPsych.randomization.repeat([0,1],num_trials_main/2);
+            var stim_instr = " left tilted gratings. ";
+            var stim_pic   = "img/stim_1_vis_50.png";
+            var ima_instr = " <strong>also</strong> ";
+            window.vis_level = window.left_vis_level;
+          } else if (condition_order[window.block_num] == 3) {
+            window.trial_order = jsPsych.randomization.repeat([0,2],num_trials_main/2);
+            var stim_instr = " right tilted gratings. ";
+            var stim_pic   = "img/stim_2_vis_50.png";
+            var ima_instr = " <strong>also</strong> ";
+            window.vis_level = window.right_vis_level;
+          }
+
+          jsPsych.pluginAPI.preloadImages([stim_pic])
+
+        return "<br> This is block " + (window.block_num+1) + " out of " + (num_blocks*4) +
+        "<br> During this block you will see " + stim_instr +
+        "<br> They will be harder to see than the one shown below. " +
+        "<br> Please " + ima_instr + "imagine this grating during each trial. <br>" +
+        "Remember, the grating will be present on 75% of the trials. <br> <br> " +
+        "<img src=" + stim_pic + " width=200 ></img>" +
+        "<br> <br> Press [space] to continue "
+      },
+      choices: ['space']
+      };
+      timeline.push(block_start);
+
+      /* trial loop */
+      for (var trl = 0; trl < num_trials_main; trl++){
+
+        var show_dynamic_stimulus = {
+          type: 'animation',
+          stimuli: function() {
+
+            window.stim_id = window.trial_order[window.trl_num];
+            arr = makeStimSequence(1, window.vis_level,num_steps,window.stim_id);
+            jsPsych.pluginAPI.preloadImages(arr)
+            return arr
+          },
+          choices: jsPsych.NO_KEYS,
+          frame_isi: 0,
+          frame_time: Math.round(stim_dur/num_steps),
+          on_finish: function(){
+            console.log(window.vis_level);
+          }
+        };
+
+        var response_screen = {
+          type: "html-keyboard-response",
+          choices: responses,
+          stimulus: 'Was there a grating on the screen?',
+          prompt: response_prompt,
+          data: function() {
+            window.stim_id = window.trial_order[window.trl_num];
+            return {test_part: 'main_test', correct_response: response[window.stim_id]}
+          },
+          on_finish: function(data){
+            data.correct = data.key_press == jsPsych.pluginAPI.convertKeyCharacterToKeyCode(data.correct_response);
+          }
+        };
+
+        timeline.push(fixation,show_dynamic_stimulus,response_screen,update_trial_number);
+      }
+
+      /* ask about imagery */
+      var check_imagery = {
+        type: "html-keyboard-response",
+        choices: ['y', 'n'],
+        stimulus: 'Check! <br> Did you imagine the grating during this block?',
+        prompt: 'Yes [Y] or no [N]',
+        data: function() {
+          if (condition_order[window.block_num] == 0 || condition_order[window.block_num] == 1){
+            return {test_part: 'ima_check', correct_response: 'n'}
+          } else if (condition_order[window.block_num] == 2 || condition_order[window.block_num] == 3){
+            return {test_part: 'ima_check', correct_response: 'y'}
+          };
+        },
+        on_finish: function(data){
+          data.correct = data.key_press == jsPsych.pluginAPI.convertKeyCharacterToKeyCode(data.correct_response);
+        }
+      };
+
+      var feedback_imagery = {
+        type: "html-keyboard-response",
+        choices: ['space'],
+        stimulus: function(){
+          var trials = jsPsych.data.get().last(10).filter({test_part: 'ima_check'});
+          var num_correct = trials.filter({correct: true}).count();
+          if (num_correct == 0) {
+            return "That's incorrect, please read the instructions carefully. <br>" +
+            "<br> Press [space] to continue"
+          } else if (num_correct > 0 ){
+            return "Excellent! <br><br> Press [space] to continue"
+          }
+        }
+      };
+
+      /* update block number */
+      var update_block_number = {
+        type: "call-function",
+        func: function() {
+          window.block_num++;
+        }
+      };
+      timeline.push(check_imagery,feedback_imagery,update_block_number);
+    }
+
+    /* DEBRIEF QUESTIONS */
+    var debrief_questions = {
+      type: 'survey-text',
+      questions: [
+        {prompt: "The answer to this question will not affect your payment. " +
+          "Did you actually imagine the gratings in the blocks when we asked you to?", rows: 8, columns: 30},
+        {prompt: "Do you have any other comments?", rows: 8, columns: 30}
+      ]
+    };
+    timeline.push(debrief_questions);
+
+    var end_experiment = {
+      type: "html-keyboard-response",
+      stimulus: 'Press any key to finish the experiment. <br> Thank you for participating!'
+    };
+    timeline.push(end_experiment);
+
+
+    /* START THE EXPERIMENT */
+    jsPsych.init({
+      timeline: timeline,
+      on_finish: function() {
+        var resultJson = JSON.stringify(jsPsych.data.get().csv());
+        jatos.submitResultData(resultJson, jatos.endStudy);
+      }
+    });
+  </script>
+</html>
