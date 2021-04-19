@@ -2,7 +2,7 @@
 
 This repository contains the data, analysis code and experimental code supporting: 
 
-Dijkstra, Mazor, Kok & Fleming (2021) "Mistaking imagination for reality: congruent mental imagery leads to more liberal perceptual detection"
+Dijkstra, Mazor, Kok & Fleming (2021) "Mistaking imagination for reality: congruent mental imagery leads to more liberal perceptual detection" https://www.sciencedirect.com/science/article/pii/S0010027721001384
 
 The 'ExperimentX/Data.zip' folders contain .mat files for each participant with trial by trial data in the 'data' variable and summary stats such as d' and criterion in the 'results' variable. NOTE: you need to unzip these files before the analyses code can be run.
 
