@@ -10,3 +10,5 @@ The 'ExperimentX/Analyses' folders contain all scipts required for analysis. Eac
 The 'check_data.m' scripts check the data based on the exclusion criteria in the paper and output a 1 if the participant should be included and a 0 if not. 
 
 The 'ExperimentX/jsPsych' folders contain the .html code to run the experiment online using jsPsych. 
+
+The 'img.zip' file contains the stimulus images which need to be unzipped in the experiment folders so that jsPsych can load them.
